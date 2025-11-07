@@ -22,23 +22,6 @@ pool_ids = [
 ]
 
 
-def main():
-
-    for pool in pool_ids:
-        try:
-            raw_pool_data = fetch_pool(pool)
-            if not raw_pool_data:
-                log_error(pool, "API returned no data")
-                
-            wallet_shares = filter_snapshot(raw_pool_data)
-            write_snapshot(pool, wallet_shares)
-
-            time.sleep(1)  # Be nice to the API
-
-        except Exception as e:
-            log_error(pool, str(e))
-
-
 def fetch_pool(pool):
     """Return raw API response"""
 
@@ -103,4 +86,17 @@ def log_error(pool, message):
 
 
 if __name__ == "__main__":
-    main()
+    
+    for pool in pool_ids:
+        try:
+            raw_pool_data = fetch_pool(pool)
+            if not raw_pool_data:
+                log_error(pool, "API returned no data")
+                
+            wallet_shares = filter_snapshot(raw_pool_data)
+            write_snapshot(pool, wallet_shares)
+
+            time.sleep(1)  # Be nice to the API
+
+        except Exception as e:
+            log_error(pool, str(e))
