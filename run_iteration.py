@@ -31,8 +31,6 @@ def fetch_pool(pool):
         "User-Agent": "Mozilla/5.0"
     }
 
-    #TODO: Add error handling
-
     raw_pool_data = requests.get(url, headers=headers)
     return raw_pool_data.json()
 
@@ -80,11 +78,25 @@ def write_snapshot(pool, wallet_shares):
     df_combined.to_csv(pool_file)
 
 
+def log_error(pool, message):
+
+    entry = {"timestamp": datetime.now(timezone.utc).isoformat(), "pool": f"{pool.get('tokenA')}_{pool.get('tokenB')}", "error": message}
+    with ERROR_LOG.open("a") as f:
+        f.write(f"{entry}\n")
+
+
 if __name__ == "__main__":
-
+    
     for pool in pool_ids:
-        raw_pool_data = fetch_pool(pool)
-        wallet_shares = filter_snapshot(raw_pool_data)
-        write_snapshot(pool, wallet_shares)
+        try:
+            raw_pool_data = fetch_pool(pool)
+            if not raw_pool_data:
+                log_error(pool, "API returned no data")
+                
+            wallet_shares = filter_snapshot(raw_pool_data)
+            write_snapshot(pool, wallet_shares)
 
-        time.sleep(1)  # Be nice to the API
+            time.sleep(1)  # Be nice to the API
+
+        except Exception as e:
+            log_error(pool, str(e))
