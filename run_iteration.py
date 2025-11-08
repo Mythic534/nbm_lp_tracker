@@ -61,7 +61,7 @@ def filter_snapshot(raw_pool_data):
 def write_snapshot(pool, wallet_shares):
 
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-    pool_file = DATA_DIR / f"{pool.get("tokenA")}_{pool.get("tokenB")}.csv"
+    pool_file = DATA_DIR / f"{pool.get('tokenA')}_{pool.get('tokenB')}.csv"
 
     df_new = wallet_shares.copy()
     df_new["timestamp"] = timestamp
