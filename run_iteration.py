@@ -1,4 +1,6 @@
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -7,6 +9,8 @@ import pandas as pd
 # === Config ===
 DATA_DIR = Path("data")
 ERROR_LOG = Path("errors/api_errors.log")
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+ERROR_LOG.parent.mkdir(parents=True, exist_ok=True)
 
 pool_ids = [
     {"id": 294, "tokenA": "NBMFUS", "tokenB": "NBMACT"},
@@ -21,7 +25,6 @@ pool_ids = [
     {"id": 246, "tokenA": "NBMCON", "tokenB": "WAX"},
 ]
 
-
 def fetch_pool(pool):
     """Return raw API response"""
 
@@ -32,7 +35,9 @@ def fetch_pool(pool):
     }
 
     raw_pool_data = requests.get(url, headers=headers)
-    return raw_pool_data.json()
+    if raw_pool_data.status_code != 200:
+        raise Exception(f"API request failed with status code {raw_pool_data.status_code}")
+    return raw_pool_data
 
 
 def filter_snapshot(raw_pool_data):
@@ -93,7 +98,7 @@ if __name__ == "__main__":
             if not raw_pool_data:
                 log_error(pool, "API returned no data")
                 
-            wallet_shares = filter_snapshot(raw_pool_data)
+            wallet_shares = filter_snapshot(raw_pool_data.json())
             write_snapshot(pool, wallet_shares)
 
             time.sleep(1)  # Be nice to the API
