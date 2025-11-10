@@ -35,8 +35,15 @@ def fetch_pool(pool):
     }
 
     raw_pool_data = requests.get(url, headers=headers)
+
+    # Alcor API can be unreliable
+    if raw_pool_data.status_code == 504:
+        time.sleep(10)
+        fetch_pool(pool)
+
     if raw_pool_data.status_code != 200:
         raise Exception(f"API request failed with status code {raw_pool_data.status_code}")
+    
     return raw_pool_data
 
 
