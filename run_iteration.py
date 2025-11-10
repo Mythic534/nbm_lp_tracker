@@ -25,26 +25,60 @@ pool_ids = [
     {"id": 246, "tokenA": "NBMCON", "tokenB": "WAX"},
 ]
 
-def fetch_pool(pool):
+
+def create_session():
+
+    session = requests.Session()
+
+    retry_strategy = Retry(
+        total=20,
+        backoff_factor=2,
+        status_forcelist=(502, 504),
+        allowed_methods=("GET",),
+        raise_on_status=False,
+    )
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+
+    return session
+
+
+def fetch_pool(pool, session, timeout=10):
     """Return raw API response"""
 
     pool_id = pool.get("id")
     url = f"https://alcor.exchange/api/v2/swap/pools/{pool_id}/positions"
-    headers = {
-        "User-Agent": "Mozilla/5.0"
-    }
+    headers = {"User-Agent": "Mozilla/5.0"}
 
-    raw_pool_data = requests.get(url, headers=headers)
+    attempts = 0
+    max_manual_retries = 3  # extra manual retry loop for logging/spacing
 
-    # Alcor API can be unreliable
-    if raw_pool_data.status_code == 504:
-        time.sleep(10)
-        fetch_pool(pool)
+    while attempts <= max_manual_retries:
 
-    if raw_pool_data.status_code != 200:
-        raise Exception(f"API request failed with status code {raw_pool_data.status_code}")
-    
-    return raw_pool_data
+        attempts += 1      
+        try:
+            response = session.get(url, headers=headers, timeout=timeout)
+
+        except requests.exceptions.RequestException as exc:
+            log_error(pool, f"network error on attempt {attempts}: {exc}")
+            if attempts <= max_manual_retries:
+                time.sleep(5)
+                continue
+            raise Exception(f"Network error after {attempts} attempts: {exc}") from exc
+
+        if response.status_code in (502, 504):
+            log_error(pool, f"server {response.status_code} on attempt {attempts}, retrying")
+            time.sleep(5)
+            if attempts <= max_manual_retries:
+                continue
+
+        if response.status_code != 200:
+            raise Exception(f"API request failed with status code {response.status_code}: {response.text[:200]}")
+        
+        return response
+
+    raise Exception("Failed to fetch pool after retries")
 
 
 def filter_snapshot(raw_pool_data):
@@ -99,11 +133,11 @@ def log_error(pool, message):
 
 if __name__ == "__main__":
     
+    session = create_session()
+
     for pool in pool_ids:
         try:
-            raw_pool_data = fetch_pool(pool)
-            if not raw_pool_data:
-                log_error(pool, "API returned no data")
+            raw_pool_data = fetch_pool(pool, session)
                 
             wallet_shares = filter_snapshot(raw_pool_data.json())
             write_snapshot(pool, wallet_shares)
